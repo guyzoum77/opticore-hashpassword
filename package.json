@@ -1,5 +1,5 @@
 {
-  "name": "hashing-password",
+  "name": "opticore-hashing-password",
   "version": "1.0.0",
   "description": "Hashing password",
   "main": "dist/index.js",

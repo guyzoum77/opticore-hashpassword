@@ -1,3 +1,3 @@
-import {HashPasswordService} from "./services/hashPassword.service";
+import {HashPasswordService} from "./core/services/hashPassword.service";
 
 export { HashPasswordService }

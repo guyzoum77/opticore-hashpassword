@@ -3,9 +3,9 @@ import * as bcrypt from "bcrypt";
 import * as argon2 from "argon2";
 import {scrypt} from "scrypt-js";
 import crypto from "crypto";
-import {HashContratAbstract} from "../core/abstract/hashContrat.abstract";
-import {HashAlgorithmType} from "../core/types/hashAlgorithm.type";
-import {dateTimeFormattedUtils} from "../core/utils/dateTimeFormatted.utils";
+import {HashContratAbstract} from "../abstract/hashContrat.abstract";
+import {HashAlgorithmType} from "../types/hashAlgorithm.type";
+import {dateTimeFormattedUtils} from "../utils/dateTimeFormatted.utils";
 
 export class HashPasswordService extends HashContratAbstract {
 

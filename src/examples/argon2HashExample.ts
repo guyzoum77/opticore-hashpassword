@@ -1,4 +1,4 @@
-import {HashPasswordService} from "../services/hashPassword.service";
+import {HashPasswordService} from "../core/services/hashPassword.service";
 import {HashAlgorithmType} from "../core/types/hashAlgorithm.type";
 
 async function main(): Promise<void> {
