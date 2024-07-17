@@ -19,7 +19,7 @@ export class HashPasswordService extends HashContratAbstract {
      *
      * Return decrypted data or handled error if any parameters are not provided or are wrong
      */
-    decryptPasswordRSA(encryptedPassword: string, privateKey: string, bufferEncoding: BufferEncoding): string {
+    public decryptPasswordRSA(encryptedPassword: string, privateKey: string, bufferEncoding: BufferEncoding): string {
         let decrypted;
         try {
             const buffer: Buffer = Buffer.from(encryptedPassword, bufferEncoding);
@@ -42,7 +42,7 @@ export class HashPasswordService extends HashContratAbstract {
      *
      * Return encrypted data or handled error if any parameters are not provided or are wrong
      */
-    encryptPasswordRSA(password: string, publicKey: string, bufferEncoding: BufferEncoding): string {
+    public encryptPasswordRSA(password: string, publicKey: string, bufferEncoding: BufferEncoding): string {
         try {
             const buffer: Buffer = Buffer.from(password);
             const encrypted: Buffer = crypto.publicEncrypt(publicKey, buffer);
@@ -63,7 +63,7 @@ export class HashPasswordService extends HashContratAbstract {
      *
      * Return a strong pseudorandom data or handling an error and return the callback function
      */
-    generateSalt(length: number, bufferEncoding: BufferEncoding): string {
+    public generateSalt(length: number, bufferEncoding: BufferEncoding): string {
         try {
             return crypto.randomBytes(length).toString(bufferEncoding);
         } catch (err: any) {
@@ -103,7 +103,7 @@ export class HashPasswordService extends HashContratAbstract {
      *
      * Return data hashed or handled an any error
      */
-    async hashPassword(password: string, salt: string, algorithm: HashAlgorithmType, iterations: number,
+    public async hashPassword(password: string, salt: string, algorithm: HashAlgorithmType, iterations: number,
                        keyLength: number, bufferEncoding: BufferEncoding | undefined): Promise<any> {
         switch (algorithm) {
             case 'sha256':
@@ -185,7 +185,7 @@ export class HashPasswordService extends HashContratAbstract {
      * It hashes the provided password with the stored salt and compares it to the stored hashed password,
      * returning true if they match, otherwise false.
      */
-    async verifyHashPassword(storedHashedPassword: string, storedSalt: string, providedPassword: string,
+    public async verifyHashPassword(storedHashedPassword: string, storedSalt: string, providedPassword: string,
                              algorithm: HashAlgorithmType, iterations: number, keyLength: number,
                              bufferEncoding: BufferEncoding | undefined): Promise<boolean> {
         const hashedProvidedPassword = await this.hashPassword(
