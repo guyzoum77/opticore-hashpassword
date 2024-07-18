@@ -16,14 +16,13 @@ export class HashPasswordService extends HashContractAbstract {
      *
      * @param hashedPassword
      * @param privateKey
-     * @param bufferEncoding
      * @protected
      */
-    protected signHash(hashedPassword: any, privateKey: string, bufferEncoding: BufferEncoding | BinaryToTextEncoding): string {
+    protected signHash(hashedPassword: any, privateKey: string): string {
         const sign: crypto.Sign = crypto.createSign("sha3-512");
         sign.update(hashedPassword);
         sign.end();
-        return sign.sign(privateKey, <"base64" | "base64url" | "hex" | "binary">bufferEncoding);
+        return sign.sign(privateKey, "hex");
     }
 
     /**
@@ -149,7 +148,7 @@ export class HashPasswordService extends HashContractAbstract {
                                     console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
                                     reject(err);
                                 }
-                                const signedHash: string = this.signHash(derivedKey.toString(bufferEncoding), privateRSAKey, bufferEncoding);
+                                const signedHash: string = this.signHash(derivedKey.toString(bufferEncoding), privateRSAKey);
                                 return resolve({ "signedHash": signedHash, "hashedPassword": derivedKey.toString(bufferEncoding) });
                             }
                         );
@@ -160,7 +159,7 @@ export class HashPasswordService extends HashContractAbstract {
             case 'bcrypt':
                 try {
                     const dataEncrypted: string = await bcrypt.hash(password, await bcrypt.genSalt());
-                    const signedHash: string = this.signHash(dataEncrypted, privateRSAKey, bufferEncoding);
+                    const signedHash: string = this.signHash(dataEncrypted, privateRSAKey);
                     return { "signedHash": signedHash, "hashPassword": dataEncrypted };
                 } catch (err: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black("bcrypt Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at bcrypt level")}`)} ] - [ ${colors.red(`${err.code}`)} ] - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
@@ -172,7 +171,7 @@ export class HashPasswordService extends HashContractAbstract {
                     const derivedKey: Uint8Array = await scrypt(passwordBuffer, saltBuffer, iterations, 8, 1, keyLength);
 
                     const hashedPass: string = Buffer.from(derivedKey).toString(bufferEncoding);
-                    const signedPassHashed: string = this.signHash(hashedPass, privateRSAKey, bufferEncoding);
+                    const signedPassHashed: string = this.signHash(hashedPass, privateRSAKey);
                     return { "signedPassHashed": signedPassHashed, "hashedPass": hashedPass };
                 } catch (err: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black("Scrypt Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at scrypt level")}`)} ] - [ ${colors.red(`${err.code}`)} ] - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
@@ -189,7 +188,7 @@ export class HashPasswordService extends HashContractAbstract {
                         }
                     );
                     const passHashed: string = await dataHashed;
-                    const signedHash: string = this.signHash(passHashed, privateRSAKey, bufferEncoding);
+                    const signedHash: string = this.signHash(passHashed, privateRSAKey);
                     return { "signedHash": signedHash, "hashPassword": passHashed };
                 } catch (e: any) {
                     switch (e.code) {
@@ -223,69 +222,47 @@ export class HashPasswordService extends HashContractAbstract {
      *
      */
     public async verifyHashPassword(storedHashedPassword: string, signedHashStored: any, storedSalt: any, providedPassword: string,
-                             algorithm: HashAlgorithmType, iterations: number, keyLength: number,
-                             bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicRSAKey: string): Promise<boolean> {
-        const validSignedHash: boolean = this.verifySignedHash(storedHashedPassword, signedHashStored, bufferEncoding, publicRSAKey);
+                                    algorithm: HashAlgorithmType, iterations: number, keyLength: number,
+                                    bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicRSAKey: string): Promise<boolean> {
+        const validSignedHash: boolean = this.verifySignedHash(storedHashedPassword, signedHashStored, publicRSAKey);
+        if (!validSignedHash) {
+            LogMessageCore.error(
+                "Algorithm signature error",
+                "Invalid signature",
+                "Signed hash is invalid",
+                constants.HTTP_STATUS_NOT_ACCEPTABLE
+            );
+            return false;
+        }
         switch (algorithm) {
             case 'bcrypt':
-                if (!validSignedHash) {
-                    LogMessageCore.error(
-                        "Algorithm signature error",
-                        "Invalid signature",
-                        "Signed hash is invalid",
-                        constants.HTTP_STATUS_NOT_ACCEPTABLE
-                    );
-                    return !validSignedHash;
-                } else {
-                    return bcrypt.compare(providedPassword, storedHashedPassword);
-                }
+                return bcrypt.compare(providedPassword, storedHashedPassword);
             case 'argon2':
-                if (!validSignedHash) {
-                    LogMessageCore.error(
-                        "Algorithm signature error",
-                        "Invalid signature",
-                        "Signed hash is invalid",
-                        constants.HTTP_STATUS_NOT_ACCEPTABLE
-                    );
-                    return !validSignedHash;
-                } else {
-                    return argon2.verify(storedHashedPassword, providedPassword);
-                }
+                return argon2.verify(storedHashedPassword, providedPassword);
             default:
-                if (!validSignedHash) {
-                    LogMessageCore.error(
-                        "Algorithm signature error",
-                        "Invalid signature",
-                        "Signed hash is invalid",
-                        constants.HTTP_STATUS_NOT_ACCEPTABLE
-                    );
-                    return !validSignedHash;
-                } else {
-                    try {
-                        const derivedKey: Buffer = await new Promise<Buffer>((resolve, reject) => {
-                            crypto.pbkdf2(providedPassword, storedSalt, iterations, keyLength, algorithm, (err, derivedKey) => {
-                                if (err) {
-                                    reject(err);
-                                } else {
-                                    resolve(derivedKey);
-                                }
-                            });
+                try {
+                    const derivedKey: Buffer = await new Promise<Buffer>((resolve, reject) => {
+                        crypto.pbkdf2(providedPassword, storedSalt, iterations, keyLength, algorithm, (err, derivedKey) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve(derivedKey);
+                            }
                         });
-
-                        const derivedKeyString: string = derivedKey.toString(bufferEncoding);
-                        return derivedKeyString === storedHashedPassword;
-                    } catch (error: any) {
-                        console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${error.name}`)} ] ${colors.red(`${error.stack}`)} - ${colors.red(`${error.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
-                        return false;
-                    }
+                    });
+                    const derivedKeyString: string = derivedKey.toString(bufferEncoding);
+                    return derivedKeyString === storedHashedPassword;
+                } catch (error: any) {
+                    console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${error.name}`)} ] ${colors.red(`${error.stack}`)} - ${colors.red(`${error.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
+                    return false;
                 }
         }
     }
 
-    protected verifySignedHash(hashedPassword: any, signedHash: any, bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicKey: string): boolean {
+    protected verifySignedHash(hashedPassword: any, signedHash: any, publicKey: string): boolean {
         const verify: crypto.Verify = crypto.createVerify("sha3-512");
         verify.update(hashedPassword);
         verify.end();
-        return verify.verify(publicKey, signedHash, <"base64" | "base64url" | "hex" | "binary">bufferEncoding);
+        return verify.verify(publicKey, signedHash, "hex");
     }
 }
