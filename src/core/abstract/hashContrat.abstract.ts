@@ -39,6 +39,8 @@ export abstract class HashContratAbstract {
 
     /**
      *
+     * @param fetchUserById
+     * @param id
      * @param storedHashedPassword
      * @param storedSalt
      * @param providedPassword
@@ -49,5 +51,5 @@ export abstract class HashContratAbstract {
      */
     abstract verifyHashPassword(storedHashedPassword: string, storedSalt: string, providedPassword: string,
                                 algorithm: HashAlgorithmType, iterations: number, keyLength: number,
-                                bufferEncoding: BufferEncoding ): Promise<boolean>;
+                                bufferEncoding: BufferEncoding ): Promise<boolean | void>;
 }

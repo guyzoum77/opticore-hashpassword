@@ -6,6 +6,7 @@ import crypto from "crypto";
 import {HashContratAbstract} from "../abstract/hashContrat.abstract";
 import {HashAlgorithmType} from "../types/hashAlgorithm.type";
 import {dateTimeFormattedUtils} from "../utils/dateTimeFormatted.utils";
+import {createHmac, verify} from "node:crypto";
 
 export class HashPasswordService extends HashContratAbstract {
 
@@ -184,19 +185,29 @@ export class HashPasswordService extends HashContratAbstract {
      * The verifyPassword method takes the stored hashed password, stored salt, provided password, hash algorithm,
      * iterations, and key length as parameters.
      * It hashes the provided password with the stored salt and compares it to the stored hashed password,
-     * returning true if they match, otherwise false.
+     *
+     * returning true if there is match, otherwise false.
      */
     public async verifyHashPassword(storedHashedPassword: string, storedSalt: string, providedPassword: string,
                              algorithm: HashAlgorithmType, iterations: number, keyLength: number,
-                             bufferEncoding: BufferEncoding | undefined): Promise<boolean> {
-        const hashedProvidedPassword = await this.hashPassword(
-            providedPassword,
-            storedSalt,
-            algorithm,
-            iterations,
-            keyLength,
-            bufferEncoding
-        );
-        return storedHashedPassword === hashedProvidedPassword;
+                             bufferEncoding: BufferEncoding | undefined) {
+        switch (algorithm) {
+            case 'bcrypt':
+                return bcrypt.compare(providedPassword, storedHashedPassword);
+            case 'argon2':
+                return argon2.verify(storedHashedPassword, providedPassword);
+            default:
+                const hashedProvidedPassword = await this.hashPassword(
+                    providedPassword,
+                    storedSalt,
+                    algorithm,
+                    iterations,
+                    keyLength,
+                    bufferEncoding
+                );
+                console.log("hashedProvidedPassword is :", hashedProvidedPassword);
+                console.log("storedHashedPassword is :", storedHashedPassword);
+                return storedHashedPassword === hashedProvidedPassword;
+        }
     }
 }
