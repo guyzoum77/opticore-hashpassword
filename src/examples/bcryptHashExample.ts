@@ -1,13 +1,13 @@
 import {HashPasswordService} from "../core/services/hashPassword.service";
 import {HashAlgorithmType} from "../core/types/hashAlgorithm.type";
-import PublicKey from "../core/constants/keys/public.key";
 import PrivateKey from "../core/constants/keys/private.key";
+import PublicKey from "../core/constants/keys/public.key";
 
 async function main(): Promise<void> {
     const passwordHash: HashPasswordService = new HashPasswordService();
     const plainPassword: string = "Kgs77@30";
     const salt: string = passwordHash.generateSalt(16, "hex");
-    const hashAlgorithm: HashAlgorithmType = 'sha512';
+    const hashAlgorithm: HashAlgorithmType = 'bcrypt';
 
     // you must to chosen keyLength value between 1024 and 4,294,967,295.
     // But if you choose a greater number like 4,294,967,295, make sure that your PC is very strong else your pc
@@ -19,8 +19,7 @@ async function main(): Promise<void> {
     );
 
     console.log(`Hashed password (${hashAlgorithm}):`, hashedPassword);
-    console.log('plainPassword:', plainPassword);
-    console.log('Salt:', salt);
+    //console.log('plainPassword:', plainPassword);
 
     // const isPasswordValid: boolean = await passwordHash.verifyHashPassword(
     //     hashedPassword, salt, plainPassword, hashAlgorithm, 100, 4294, "hex"

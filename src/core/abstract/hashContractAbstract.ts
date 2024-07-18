@@ -1,6 +1,8 @@
 import {HashAlgorithmType} from "../types/hashAlgorithm.type";
+import {BinaryToTextEncoding} from "node:crypto";
 
-export abstract class HashContratAbstract {
+export abstract class HashContractAbstract {
+
     /**
      *
      * @param length
@@ -16,18 +18,11 @@ export abstract class HashContratAbstract {
      * @param iterations
      * @param keyLength
      * @param bufferEncoding
+     * @param privateRSAKey
      */
     abstract hashPassword(password: string, salt: string, algorithm: HashAlgorithmType,
                           iterations: number, keyLength: number,
-                          bufferEncoding: BufferEncoding ): Promise<any>;
-
-    /**
-     *
-     * @param password
-     * @param publicKey
-     * @param bufferEncoding
-     */
-    abstract encryptPasswordRSA(password: string, publicKey: string, bufferEncoding: BufferEncoding ): string;
+                          bufferEncoding: BufferEncoding, privateRSAKey: string): Promise<any>;
 
     /**
      *
@@ -39,17 +34,26 @@ export abstract class HashContratAbstract {
 
     /**
      *
-     * @param fetchUserById
-     * @param id
      * @param storedHashedPassword
+     * @param signedHashStored
      * @param storedSalt
      * @param providedPassword
      * @param algorithm
      * @param iterations
      * @param keyLength
      * @param bufferEncoding
+     * @param publicRSAKey
      */
-    abstract verifyHashPassword(storedHashedPassword: string, storedSalt: string, providedPassword: string,
+    abstract verifyHashPassword(storedHashedPassword: string, signedHashStored: any, storedSalt: any, providedPassword: string,
                                 algorithm: HashAlgorithmType, iterations: number, keyLength: number,
-                                bufferEncoding: BufferEncoding ): Promise<boolean | void>;
+                                bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicRSAKey: string): Promise<boolean | void>;
+
+    /**
+     *
+     * @param hashedPassword
+     * @param signedHash
+     * @param bufferEncoding
+     * @param publicKey
+     */
+    protected abstract verifySignedHash(hashedPassword: any, signedHash: any, bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicKey: string): boolean;
 }

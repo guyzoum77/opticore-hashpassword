@@ -3,12 +3,74 @@ import * as bcrypt from "bcrypt";
 import * as argon2 from "argon2";
 import {scrypt} from "scrypt-js";
 import crypto from "crypto";
-import {HashContratAbstract} from "../abstract/hashContrat.abstract";
+import {HashContractAbstract} from "../abstract/hashContractAbstract";
 import {HashAlgorithmType} from "../types/hashAlgorithm.type";
 import {dateTimeFormattedUtils} from "../utils/dateTimeFormatted.utils";
-import {createHmac, verify} from "node:crypto";
+import {BinaryToTextEncoding} from "node:crypto";
+import {LogMessageCore} from "opticore-console-log-message";
+import {constants} from "node:http2";;
 
-export class HashPasswordService extends HashContratAbstract {
+export class HashPasswordService extends HashContractAbstract {
+
+    /**
+     *
+     * @param hashedPassword
+     * @param privateKey
+     * @param bufferEncoding
+     * @protected
+     */
+    protected signHash(hashedPassword: any, privateKey: string, bufferEncoding: BufferEncoding | BinaryToTextEncoding): string {
+        const sign: crypto.Sign = crypto.createSign("sha3-512");
+        sign.update(hashedPassword);
+        sign.end();
+        return sign.sign(privateKey, <"base64" | "base64url" | "hex" | "binary">bufferEncoding);
+    }
+
+    /**
+     *
+     * @param password
+     * @param publicKey
+     * @param bufferEncoding
+     *
+     * The method encryptPasswordRSA is encrypting the hashed password using the public RSA key.
+     *
+     * Return encrypted data or handled error if any parameters are not provided or are wrong
+     */
+    protected encryptPasswordRSA(password: string, publicKey: string, bufferEncoding: BufferEncoding): string {
+        try {
+            const buffer: Buffer = Buffer.from(password);
+            const encrypted: Buffer = crypto.publicEncrypt(
+                {
+                    key: Buffer.from(publicKey),
+                    padding: crypto.constants.RSA_PKCS1_PADDING,
+                },
+                buffer
+            );
+
+            return encrypted.toString(bufferEncoding);
+        } catch (err: any) {
+            console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("Crypto publicEncrypt error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at publicEncrypt level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
+            return err.message;
+        }
+    }
+
+    /**
+     *
+     * @param length
+     * @param bufferEncoding
+     *
+     * The method generateSalt is generating a random salt for hashing.
+     *
+     * Return a strong pseudorandom data or handling an error and return the callback function
+     */
+    public generateSalt(length: number, bufferEncoding: BufferEncoding): string {
+        try {
+            return crypto.randomBytes(length).toString(bufferEncoding);
+        } catch (err: any) {
+            console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("Crypto randomBytes error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at randomBytes level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(` 406 `)}`)} `);
+            return err.message;
+        }
+    }
 
     /**
      *
@@ -33,46 +95,6 @@ export class HashPasswordService extends HashContratAbstract {
         return decrypted.toString(bufferEncoding);
     }
 
-    /**
-     *
-     * @param password
-     * @param publicKey
-     * @param bufferEncoding
-     *
-     * The method encryptPasswordRSA is encrypting the hashed password using the public RSA key.
-     *
-     * Return encrypted data or handled error if any parameters are not provided or are wrong
-     */
-    public encryptPasswordRSA(password: string, publicKey: string, bufferEncoding: BufferEncoding): string {
-        try {
-            const buffer: Buffer = Buffer.from(password);
-            const encrypted: Buffer = crypto.publicEncrypt(publicKey, buffer);
-
-            return encrypted.toString(bufferEncoding);
-        } catch (err: any) {
-            console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("Crypto publicEncrypt error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at publicEncrypt level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
-            return "";
-        }
-    }
-
-    /**
-     *
-     * @param length
-     * @param bufferEncoding
-     *
-     * The method generateSalt is generating a random salt for hashing.
-     *
-     * Return a strong pseudorandom data or handling an error and return the callback function
-     */
-    public generateSalt(length: number, bufferEncoding: BufferEncoding): string {
-        try {
-            return crypto.randomBytes(length).toString(bufferEncoding);
-        } catch (err: any) {
-            console.log("error is :", colors);
-            console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("Crypto randomBytes error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at randomBytes level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(` 406 `)}`)} `);
-            return "";
-        }
-    }
 
     /**
      *
@@ -104,9 +126,10 @@ export class HashPasswordService extends HashContratAbstract {
      * with a specified number of iterations, key length, and a bufferEncoding
      *
      * Return data hashed or handled an any error
+     * @param privateRSAKey
      */
     public async hashPassword(password: string, salt: string, algorithm: HashAlgorithmType, iterations: number,
-                       keyLength: number, bufferEncoding: BufferEncoding | undefined): Promise<any> {
+                       keyLength: number, bufferEncoding: BufferEncoding | BinaryToTextEncoding, privateRSAKey: string): Promise<any> {
         switch (algorithm) {
             case 'sha256':
             case 'sha512':
@@ -126,15 +149,19 @@ export class HashPasswordService extends HashContratAbstract {
                                     console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
                                     reject(err);
                                 }
-                                resolve(derivedKey.toString(bufferEncoding));
-                            });
+                                const signedHash: string = this.signHash(derivedKey.toString(bufferEncoding), privateRSAKey, bufferEncoding);
+                                return resolve({ "signedHash": signedHash, "hashedPassword": derivedKey.toString(bufferEncoding) });
+                            }
+                        );
                     });
                 } catch (error: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.white("Hash algorithm error")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Unsupported")}`)} ] | [ ${colors.bold("Unsupported hash")} ] ${colors.red("")} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
                 }
             case 'bcrypt':
                 try {
-                    return bcrypt.hash(password, await bcrypt.genSalt());
+                    const dataEncrypted: string = await bcrypt.hash(password, await bcrypt.genSalt());
+                    const signedHash: string = this.signHash(dataEncrypted, privateRSAKey, bufferEncoding);
+                    return { "signedHash": signedHash, "hashPassword": dataEncrypted };
                 } catch (err: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black("bcrypt Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at bcrypt level")}`)} ] - [ ${colors.red(`${err.code}`)} ] - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
                 }
@@ -144,13 +171,15 @@ export class HashPasswordService extends HashContratAbstract {
                     const saltBuffer: Buffer = Buffer.from(salt);
                     const derivedKey: Uint8Array = await scrypt(passwordBuffer, saltBuffer, iterations, 8, 1, keyLength);
 
-                    return Buffer.from(derivedKey).toString(bufferEncoding);
+                    const hashedPass: string = Buffer.from(derivedKey).toString(bufferEncoding);
+                    const signedPassHashed: string = this.signHash(hashedPass, privateRSAKey, bufferEncoding);
+                    return { "signedPassHashed": signedPassHashed, "hashedPass": hashedPass };
                 } catch (err: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black("Scrypt Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at scrypt level")}`)} ] - [ ${colors.red(`${err.code}`)} ] - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
                 }
             case 'argon2':
                 try {
-                    return await argon2.hash(
+                    const dataHashed =  argon2.hash(
                         password,
                         {
                             salt: Buffer.from(salt),
@@ -159,6 +188,9 @@ export class HashPasswordService extends HashContratAbstract {
                             type: argon2.argon2id
                         }
                     );
+                    const passHashed: string = await dataHashed;
+                    const signedHash: string = this.signHash(passHashed, privateRSAKey, bufferEncoding);
+                    return { "signedHash": signedHash, "hashPassword": passHashed };
                 } catch (e: any) {
                     switch (e.code) {
                         case "ERR_ASSERTION":
@@ -175,39 +207,85 @@ export class HashPasswordService extends HashContratAbstract {
     /**
      *
      * @param storedHashedPassword
+     * @param signedHashStored
      * @param storedSalt
      * @param providedPassword
      * @param algorithm
      * @param iterations
      * @param keyLength
      * @param bufferEncoding
-     *
+     * @param publicRSAKey
      * The verifyPassword method takes the stored hashed password, stored salt, provided password, hash algorithm,
      * iterations, and key length as parameters.
      * It hashes the provided password with the stored salt and compares it to the stored hashed password,
      *
      * returning true if there is match, otherwise false.
+     *
      */
-    public async verifyHashPassword(storedHashedPassword: string, storedSalt: string, providedPassword: string,
+    public async verifyHashPassword(storedHashedPassword: string, signedHashStored: any, storedSalt: any, providedPassword: string,
                              algorithm: HashAlgorithmType, iterations: number, keyLength: number,
-                             bufferEncoding: BufferEncoding | undefined) {
+                             bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicRSAKey: string): Promise<boolean> {
+        const validSignedHash: boolean = this.verifySignedHash(storedHashedPassword, signedHashStored, bufferEncoding, publicRSAKey);
         switch (algorithm) {
             case 'bcrypt':
-                return bcrypt.compare(providedPassword, storedHashedPassword);
+                if (!validSignedHash) {
+                    LogMessageCore.error(
+                        "Algorithm signature error",
+                        "Invalid signature",
+                        "Signed hash is invalid",
+                        constants.HTTP_STATUS_NOT_ACCEPTABLE
+                    );
+                    return !validSignedHash;
+                } else {
+                    return bcrypt.compare(providedPassword, storedHashedPassword);
+                }
             case 'argon2':
-                return argon2.verify(storedHashedPassword, providedPassword);
+                if (!validSignedHash) {
+                    LogMessageCore.error(
+                        "Algorithm signature error",
+                        "Invalid signature",
+                        "Signed hash is invalid",
+                        constants.HTTP_STATUS_NOT_ACCEPTABLE
+                    );
+                    return !validSignedHash;
+                } else {
+                    return argon2.verify(storedHashedPassword, providedPassword);
+                }
             default:
-                const hashedProvidedPassword = await this.hashPassword(
-                    providedPassword,
-                    storedSalt,
-                    algorithm,
-                    iterations,
-                    keyLength,
-                    bufferEncoding
-                );
-                console.log("hashedProvidedPassword is :", hashedProvidedPassword);
-                console.log("storedHashedPassword is :", storedHashedPassword);
-                return storedHashedPassword === hashedProvidedPassword;
+                if (!validSignedHash) {
+                    LogMessageCore.error(
+                        "Algorithm signature error",
+                        "Invalid signature",
+                        "Signed hash is invalid",
+                        constants.HTTP_STATUS_NOT_ACCEPTABLE
+                    );
+                    return !validSignedHash;
+                } else {
+                    try {
+                        const derivedKey: Buffer = await new Promise<Buffer>((resolve, reject) => {
+                            crypto.pbkdf2(providedPassword, storedSalt, iterations, keyLength, algorithm, (err, derivedKey) => {
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve(derivedKey);
+                                }
+                            });
+                        });
+
+                        const derivedKeyString: string = derivedKey.toString(bufferEncoding);
+                        return derivedKeyString === storedHashedPassword;
+                    } catch (error: any) {
+                        console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${error.name}`)} ] ${colors.red(`${error.stack}`)} - ${colors.red(`${error.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
+                        return false;
+                    }
+                }
         }
+    }
+
+    protected verifySignedHash(hashedPassword: any, signedHash: any, bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicKey: string): boolean {
+        const verify: crypto.Verify = crypto.createVerify("sha3-512");
+        verify.update(hashedPassword);
+        verify.end();
+        return verify.verify(publicKey, signedHash, <"base64" | "base64url" | "hex" | "binary">bufferEncoding);
     }
 }
