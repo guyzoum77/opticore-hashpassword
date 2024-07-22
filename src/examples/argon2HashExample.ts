@@ -15,16 +15,16 @@ async function main(): Promise<void> {
 
     let hashedPassword;
     hashedPassword = await passwordHash.hashPassword(
-        plainPassword, salt, hashAlgorithm, 2, 1024, "hex", PrivateKey(), PublicKey()
+        plainPassword, salt, hashAlgorithm, 2, 1024, "hex", PrivateKey, PublicKey
     );
 
     console.log(`Hashed password (${hashAlgorithm}):`, hashedPassword);
     // console.log('plainPassword:', plainPassword);
     // console.log('Salt:', salt);
 
-    // const isPasswordValid: boolean = await passwordHash.verifyHashPassword(
-    //     hashedPassword, salt, plainPassword, hashAlgorithm, 100, 4294, "hex"
-    // );
+    const isPasswordValid: boolean = await passwordHash.verifyHashPassword(
+        hashedPassword, salt, plainPassword, hashAlgorithm, 100, 4294, "hex"
+    );
     // console.log('Is it a valid password ? ', isPasswordValid);
 }
 

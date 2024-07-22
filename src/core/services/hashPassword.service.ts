@@ -1,14 +1,13 @@
 import colors from "ansi-colors";
 import * as bcrypt from "bcrypt";
 import * as argon2 from "argon2";
-import {scrypt} from "scrypt-js";
 import crypto from "crypto";
 import {HashContractAbstract} from "../abstract/hashContractAbstract";
 import {HashAlgorithmType} from "../types/hashAlgorithm.type";
 import {dateTimeFormattedUtils} from "../utils/dateTimeFormatted.utils";
 import {BinaryToTextEncoding} from "node:crypto";
 import {LogMessageCore} from "opticore-console-log-message";
-import {constants} from "node:http2";;
+import {constants} from "node:http2";
 
 export class HashPasswordService extends HashContractAbstract {
 
@@ -62,7 +61,7 @@ export class HashPasswordService extends HashContractAbstract {
      *
      * Return a strong pseudorandom data or handling an error and return the callback function
      */
-    public generateSalt(length: number, bufferEncoding: BufferEncoding): string {
+    protected generateSalt(length: number, bufferEncoding: BufferEncoding): string {
         try {
             return crypto.randomBytes(length).toString(bufferEncoding);
         } catch (err: any) {
@@ -130,33 +129,20 @@ export class HashPasswordService extends HashContractAbstract {
     public async hashPassword(password: string, salt: string, algorithm: HashAlgorithmType, iterations: number,
                        keyLength: number, bufferEncoding: BufferEncoding | BinaryToTextEncoding, privateRSAKey: string): Promise<any> {
         switch (algorithm) {
-            case 'sha256':
-            case 'sha512':
-            case 'sha3-256':
-            case 'sha3-512':
-            case 'blake2b512':
+            case "sha256":
+            case "sha512":
+            case "sha3-256":
+            case "sha3-512":
+            case "blake2b512":
                 try {
                     return new Promise((resolve, reject): void => {
-                        crypto.pbkdf2(
-                            password,
-                            salt,
-                            iterations,
-                            keyLength,
-                            algorithm,
-                            (err: Error | null, derivedKey: Buffer): void => {
-                                if (err) {
-                                    console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${err.name}`)} ] ${colors.red(`${err.stack}`)} - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
-                                    reject(err);
-                                }
-                                const signedHash: string = this.signHash(derivedKey.toString(bufferEncoding), privateRSAKey);
-                                return resolve({ "signedHash": signedHash, "hashedPassword": derivedKey.toString(bufferEncoding) });
-                            }
-                        );
+                        const hash: string = crypto.pbkdf2Sync(password, salt, iterations, keyLength, algorithm).toString(bufferEncoding);
+                        return resolve({ "signedHash": [salt, hash].join("$"), "hashedPassword": [salt, hash].join("$") });
                     });
                 } catch (error: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.white("Hash algorithm error")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Unsupported")}`)} ] | [ ${colors.bold("Unsupported hash")} ] ${colors.red("")} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
                 }
-            case 'bcrypt':
+            case "bcrypt":
                 try {
                     const dataEncrypted: string = await bcrypt.hash(password, await bcrypt.genSalt());
                     const signedHash: string = this.signHash(dataEncrypted, privateRSAKey);
@@ -164,21 +150,9 @@ export class HashPasswordService extends HashContractAbstract {
                 } catch (err: any) {
                     return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black("bcrypt Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at bcrypt level")}`)} ] - [ ${colors.red(`${err.code}`)} ] - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
                 }
-            case 'scrypt':
+            case "argon2":
                 try {
-                    const passwordBuffer: Buffer = Buffer.from(password);
-                    const saltBuffer: Buffer = Buffer.from(salt);
-                    const derivedKey: Uint8Array = await scrypt(passwordBuffer, saltBuffer, iterations, 8, 1, keyLength);
-
-                    const hashedPass: string = Buffer.from(derivedKey).toString(bufferEncoding);
-                    const signedPassHashed: string = this.signHash(hashedPass, privateRSAKey);
-                    return { "signedPassHashed": signedPassHashed, "hashedPass": hashedPass };
-                } catch (err: any) {
-                    return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black("Scrypt Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at scrypt level")}`)} ] - [ ${colors.red(`${err.code}`)} ] - ${colors.red(`${err.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
-                }
-            case 'argon2':
-                try {
-                    const dataHashed =  argon2.hash(
+                    const passHashed: string = await argon2.hash(
                         password,
                         {
                             salt: Buffer.from(salt),
@@ -187,15 +161,14 @@ export class HashPasswordService extends HashContractAbstract {
                             type: argon2.argon2id
                         }
                     );
-                    const passHashed: string = await dataHashed;
                     const signedHash: string = this.signHash(passHashed, privateRSAKey);
-                    return { "signedHash": signedHash, "hashPassword": passHashed };
+                    return { "signedHash": signedHash, "hashedPassword": passHashed };
                 } catch (e: any) {
                     switch (e.code) {
                         case "ERR_ASSERTION":
-                            return console.log(`${colors.red(`✘`)} ${colors.bgRed(`${colors.bold(`${colors.black(" Hashing error ")}`)}`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Argon2 Memory cost")}`)} ] - [ ${colors.red("AssertionError")} ] ${colors.red(`${e.code}`)} - ${colors.red(`${e.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
+                            return console.log(e.message)
                         default:
-                            return console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white(" Argon2 hashing error ")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring")}`)} ] | [ ${colors.bold("Type error")} ] ${colors.red(`${e.code}`)} - ${colors.red(`${e.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold("406")}`)} `);
+                            return console.log(e.message)
                     }
                 }
             default:
@@ -225,33 +198,36 @@ export class HashPasswordService extends HashContractAbstract {
                                     algorithm: HashAlgorithmType, iterations: number, keyLength: number,
                                     bufferEncoding: BufferEncoding | BinaryToTextEncoding, publicRSAKey: string): Promise<boolean> {
         const validSignedHash: boolean = this.verifySignedHash(storedHashedPassword, signedHashStored, publicRSAKey);
-        if (!validSignedHash) {
-            LogMessageCore.error(
-                "Algorithm signature error",
-                "Invalid signature",
-                "Signed hash is invalid",
-                constants.HTTP_STATUS_NOT_ACCEPTABLE
-            );
-            return false;
-        }
         switch (algorithm) {
-            case 'bcrypt':
-                return bcrypt.compare(providedPassword, storedHashedPassword);
-            case 'argon2':
-                return argon2.verify(storedHashedPassword, providedPassword);
+            case "bcrypt":
+                if (!validSignedHash) {
+                    LogMessageCore.error(
+                        "Algorithm signature error",
+                        "Invalid signature",
+                        "Signed hash is invalid",
+                        constants.HTTP_STATUS_NOT_ACCEPTABLE
+                    );
+                    return false;
+                } else {
+                    return bcrypt.compare(providedPassword, storedHashedPassword);
+                }
+            case "argon2":
+                if (!validSignedHash) {
+                    LogMessageCore.error(
+                        "Algorithm signature error",
+                        "Invalid signature",
+                        "Signed hash is invalid",
+                        constants.HTTP_STATUS_NOT_ACCEPTABLE
+                    );
+                    return false;
+                } else {
+                    return argon2.verify(storedHashedPassword, providedPassword);
+                }
             default:
                 try {
-                    const derivedKey: Buffer = await new Promise<Buffer>((resolve, reject) => {
-                        crypto.pbkdf2(providedPassword, storedSalt, iterations, keyLength, algorithm, (err, derivedKey) => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                resolve(derivedKey);
-                            }
-                        });
-                    });
-                    const derivedKeyString: string = derivedKey.toString(bufferEncoding);
-                    return derivedKeyString === storedHashedPassword;
+                    const [storedSalt, storedHashedPassword] = signedHashStored.split("$");
+                    const hash: string = crypto.pbkdf2Sync(providedPassword, storedSalt, iterations, keyLength, algorithm).toString(bufferEncoding);
+                    return hash === storedHashedPassword;
                 } catch (error: any) {
                     console.log(`${colors.red(`✘`)} ${colors.bgRed(`[ ${colors.bold(`${colors.white("crypto pbkdf2 error")}`)} ]`)} | ${dateTimeFormattedUtils()} | [ ${colors.red(`${colors.bold("Error occurring at pbkdf2 level")}`)} ] | [ ${colors.bold(`${error.name}`)} ] ${colors.red(`${error.stack}`)} - ${colors.red(`${error.message}`)} - [ ${colors.red(`${colors.bold(`HttpCode`)}`)} ] ${colors.red(`${colors.bold(`406`)}`)} `);
                     return false;
@@ -259,6 +235,13 @@ export class HashPasswordService extends HashContractAbstract {
         }
     }
 
+    /**
+     *
+     * @param hashedPassword
+     * @param signedHash
+     * @param publicKey
+     * @protected
+     */
     protected verifySignedHash(hashedPassword: any, signedHash: any, publicKey: string): boolean {
         const verify: crypto.Verify = crypto.createVerify("sha3-512");
         verify.update(hashedPassword);

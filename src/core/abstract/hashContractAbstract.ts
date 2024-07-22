@@ -8,7 +8,7 @@ export abstract class HashContractAbstract {
      * @param length
      * @param bufferEncoding
      */
-    abstract generateSalt(length: number, bufferEncoding: BufferEncoding ): string;
+    protected abstract generateSalt(length: number, bufferEncoding: BufferEncoding ): string;
 
     /**
      *
