@@ -3,7 +3,7 @@ import {HashAlgorithmType} from "../core/types/hashAlgorithm.type";
 
 async function main(): Promise<void> {
     const passwordHash: HashPasswordService = new HashPasswordService();
-    const plainPassword: string = "guyzoum1";
+    const plainPassword: string = "xxxxxxx";
     const salt: string = passwordHash.generateSalt(16, "hex");
     const hashAlgorithm: HashAlgorithmType = 'sha256';
 
