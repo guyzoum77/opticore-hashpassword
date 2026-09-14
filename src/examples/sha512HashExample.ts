@@ -5,7 +5,7 @@ import PrivateKey from "../core/constants/keys/private.key";
 
 async function main(): Promise<void> {
     const passwordHash: HashPasswordService = new HashPasswordService();
-    const plainPassword: string = "Kgs77@30";
+    const plainPassword: string = "xxxxxxxx";
     const salt: string = passwordHash.generateSalt(16, "hex");
     const hashAlgorithm: HashAlgorithmType = 'sha512';
 
