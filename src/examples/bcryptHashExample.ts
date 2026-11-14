@@ -1,30 +1,26 @@
 import {HashPasswordService} from "../core/services/hashPassword.service";
-import {HashAlgorithmType} from "../core/types/hashAlgorithm.type";
-import PrivateKey from "../core/constants/keys/private.key";
-import PublicKey from "../core/constants/keys/public.key";
+import type {HashAlgorithmType} from "../core/types/hashAlgorithm.type";
+import {exampleRsaKeys} from "./exampleRsaKeys";
 
 async function main(): Promise<void> {
     const passwordHash: HashPasswordService = new HashPasswordService();
-    const plainPassword: string = "xxxxxxx";
-    const salt: string = passwordHash.generateSalt(16, "hex");
-    const hashAlgorithm: HashAlgorithmType = 'bcrypt';
+    const {privateKey, publicKey} = exampleRsaKeys();
+    const plainPassword: string = "correct horse battery staple";
+    const hashAlgorithm: HashAlgorithmType = "bcrypt";
+    // bcrypt generates and embeds its own salt, so the salt, iterations and key length arguments are not used;
+    // passwords longer than 72 bytes (UTF-8) are refused because bcrypt would silently truncate them.
 
-    // you must to chosen keyLength value between 1024 and 4,294,967,295.
-    // But if you choose a greater number like 4,294,967,295, make sure that your PC is very strong else your pc
-    // will crash because greater number needs a lot of computing power, so be careful with keyLength value.
+    const result = await passwordHash.hashPassword(plainPassword, "", hashAlgorithm, 0, 0, "hex", privateKey);
+    if (!result) {
+        throw new Error("the password could not be hashed");
+    }
+    // store the hash and its RSA signature: verification checks the signature before the password
+    console.log(`Hashed password (${hashAlgorithm}):`, result.hashPassword);
 
-    let hashedPassword;
-    hashedPassword = await passwordHash.hashPassword(
-        plainPassword, salt, hashAlgorithm, 2, 1024, "hex", PrivateKey(), PublicKey()
+    const isPasswordValid: boolean = await passwordHash.verifyHashPassword(
+        result.hashPassword, result.signedHash, null, plainPassword, hashAlgorithm, 0, 0, "hex", publicKey
     );
-
-    console.log(`Hashed password (${hashAlgorithm}):`, hashedPassword);
-    //console.log('plainPassword:', plainPassword);
-
-    // const isPasswordValid: boolean = await passwordHash.verifyHashPassword(
-    //     hashedPassword, salt, plainPassword, hashAlgorithm, 100, 4294, "hex"
-    // );
-    // console.log('Is it a valid password ? ', isPasswordValid);
+    console.log("Is it a valid password?", isPasswordValid);
 }
 
 main().catch(console.error);
